@@ -1,0 +1,27 @@
+------------------------------------------------------------------------------
+
+*make-async-news.txt*     `make-async` changelog
+
+All notable changes to this project will be documented in this file. The
+format is based on Keep a Changelog, and this project adheres to Semantic
+Versioning.
+
+https://keepachangelog.com/en/1.1.0/
+https://semver.org/spec/v2.0.0.html
+
+==============================================================================
+Version 0.1.0-alpha - 2026-04-13                 *make-async-news-0.1.0-alpha*
+
+The initial release, containing an asynchronous |:make| replacement function
+exposed in Lua, and little else.
+
+------------------------------------------------------------------------------
+ADDED
+
+- |make-async| module, with initial asynchronous make replacement
+  implementation |make-async-api-make_async|
+
+
+
+
+ vim:tw=78:noet:ft=help:norl:
