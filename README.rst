@@ -7,7 +7,7 @@
 
 `make-async` is a package that provides an asynchronous replacement for the `:make` built-in command, allowing users to run their compiler without blocking the editor, dealing with compilation results as they occur.
 
-Full documentation is available in the help files, see `:h make-async`, or the help file directly here `make_async.txt <doc/make_async.txt>`_.
+Full documentation is available in the help files, see `:h make-async`, or the help file directly here `make-async.txt <doc/make-async.txt>`_.
 
 Requirements
 ############
@@ -117,7 +117,7 @@ See `CONTRIBUTING.rst <CONTRIBUTING.rst>`_ for more details.
 Troubleshooting
 ###############
 
-See the `TROUBLESHOOTING` section in the main help file `make_async.txt <doc/make_async.txt>`_ for common problems and their fixes.
+See the `TROUBLESHOOTING` section in the main help file `make-async.txt <doc/make-async.txt>`_ for common problems and their fixes.
 
 You can view this file directly in Neovim by running the command `:h make-async`.
 
