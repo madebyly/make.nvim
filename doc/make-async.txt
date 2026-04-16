@@ -8,7 +8,7 @@ TABLE OF CONTENTS                                             *make-async-toc*
 3. INSTALLATION & CONFIGURATION .................... |make-async-installation|
 4. USAGE .................................................. |make-async-usage|
 5. API ...................................................... |make-async-api|
-6. DIFFERENCES TO |:make| ............................. |make-async-differences|
+6. DIFFERENCES TO |:make| ........................... |make-async-differences|
 7. DEVELOPMENT ...................................... |make-async-development|
 8. TROUBLESHOOTING .............................. |make-async-troubleshooting|
 
