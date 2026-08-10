@@ -1,4 +1,4 @@
-local LOG_PREFIX = 'make-async'
+local LOG_PREFIX = 'make.nvim'
 
 -- Internal notification wrapper that prepends useful plugin context so the user knows to blame this plugin.
 --
@@ -25,7 +25,6 @@ local OPTION_SCOPES = {
 -- @param scopes OptionScopes Scope to look in to retrieve the option value.
 -- @param buffer_id? integer ID of the buffer to pull the option value from if |OptionScopes.local| is given as `scope`.
 -- @return string|nil The option's value, or nil if it wasn't found in any scope.
-
 local function do_get_most_relevant_option_value(option, scope, buffer_id)
   local option_value = nil
 
@@ -115,7 +114,8 @@ local function on_make_async_exit()
   end)
 end
 
--- @class (exact) MakeAsync
+-- @class (exact) Make
+-- @field setup function Runs `:make` asynchronously
 -- @field make_async function Runs `:make` asynchronously
 local M = {}
 
@@ -130,10 +130,10 @@ local M = {}
 --
 -- @param make_args string Arguments to append to `:make` as a string. This is passed directly to `makeprg`, so space
 --                         out arguments accordingly as youl would when running the command on the command line.
-M.make_async = function(make_args)
+M.make = function(make_args)
   local buffer_id = vim.api.nvim_get_current_buf()
 
-  local makeprg = get_most_relevant_option_value('makeprg', { OPTION_SCOPES.buffer, OPTION_SCOPES.global }, buffer_id)
+  local makeprg = M.get_makeprg()
 
   if makeprg == nil then
     notify('`makeprg` not set! Set up your compiler options before running this again.', vim.log.levels.ERROR)
@@ -186,6 +186,17 @@ M.make_async = function(make_args)
     on_stderr = output_handler,
     on_exit = on_make_async_exit,
   })
+end
+
+-- Gets the most relevant `makeprg` option value.
+--
+-- @return string|nil The option's value, or nil if it wasn't found in any scope.
+M.get_makeprg = function()
+  local buffer_id = vim.api.nvim_get_current_buf()
+
+  local makeprg = get_most_relevant_option_value('makeprg', { OPTION_SCOPES.buffer, OPTION_SCOPES.global }, buffer_id)
+
+  return makeprg
 end
 
 return M

@@ -2,12 +2,28 @@
 
 
 ##################################
- Asynchronous `:make` replacement
+ Fully integrated `:make` for Neovim
 ##################################
 
-`make-async` is a package that provides an asynchronous replacement for the `:make` built-in command, allowing users to run their compiler without blocking the editor, dealing with compilation results as they occur.
+`make.nvim` is a package that provides a replacement for the built-in `:make` command with better integration with the rest of Neovim's new features.
 
-Full documentation is available in the help files, see `:h make-async`, or the help file directly here `make-async.txt <doc/make-async.txt>`_.
+Full documentation is available in the help files, see `:h make.nvim`, or the help file directly here `make.nvim.txt <doc/make.nvim.txt>`_.
+
+
+##################################
+ Features
+##################################
+This package provides the following features:
+- a replacement for the |:make| command that populates a |quickfix| list
+  with results, allowing for the usual ease of navigation between source
+  files that quickfix lists provide normally;
+- integration with Neovim's LSP support, allowing this package's provided
+  |make.nvim-api-make| to run for a specific open LSP workspace with the
+  correct |makeprg| and related options;
+- support for long-running |makeprg|\s such as `tsc`, refreshing and
+  populating quickfix list contents with the output such that one can have a
+  continuous feed of compiler output that can be navigated through in-editor.
+
 
 Requirements
 ############
@@ -25,7 +41,7 @@ Install this package like any other Neovim package.
 An example installation via the built-in `vim.pack.add`:
 
 .. code:: lua
-    vim.pack.add({ 'https://github.com/madebyly/make-async' })
+    vim.pack.add({ 'https://github.com/madebyly/make.nvim' })
 
 
 Usage
@@ -117,7 +133,7 @@ See `CONTRIBUTING.rst <CONTRIBUTING.rst>`_ for more details.
 Troubleshooting
 ###############
 
-See the `TROUBLESHOOTING` section in the main help file `make-async.txt <doc/make-async.txt>`_ for common problems and their fixes.
+See the `TROUBLESHOOTING` section in the main help file `make.nvim.txt <doc/make.nvim.txt>`_ for common problems and their fixes.
 
 You can view this file directly in Neovim by running the command `:h make-async`.
 

@@ -1,37 +1,56 @@
-*make-async.txt*                              Asynchronous |:make| replacement
+*make.nvim.txt*                            Fully integrated |:make| for Neovim
 
 ==============================================================================
-TABLE OF CONTENTS                                             *make-async-toc*
+TABLE OF CONTENTS                                              *make.nvim-toc*
 
-1. INTRODUCTION .................................... |make-async-introduction|
-2. REQUIREMENTS .................................... |make-async-requirements|
-3. INSTALLATION & CONFIGURATION .................... |make-async-installation|
-4. USAGE .................................................. |make-async-usage|
-5. API ...................................................... |make-async-api|
-6. DIFFERENCES TO |:make| ........................... |make-async-differences|
-7. DEVELOPMENT ...................................... |make-async-development|
-8. TROUBLESHOOTING .............................. |make-async-troubleshooting|
+1. INTRODUCTION ..................................... |make.nvim-introduction|
+2. REQUIREMENTS ..................................... |make.nvim-requirements|
+3. INSTALLATION & CONFIGURATION ..................... |make.nvim-installation|
+4. USAGE ................................................... |make.nvim-usage|
+5. API ....................................................... |make.nvim-api|
+6. DIFFERENCES TO |:make| ............................ |make.nvim-differences|
+7. DEVELOPMENT ....................................... |make.nvim-development|
+8. TROUBLESHOOTING ............................... |make.nvim-troubleshooting|
 
 
 ==============================================================================
-INTRODUCTION                                         *make-async-introduction*
+INTRODUCTION                                          *make.nvim-introduction*
 
-|make-async| is a package that provides an asynchronous replacement for the
-|:make| built-in command in Lua, allowing users to run their compiler without
-blocking the editor like the |:make| built-in would.
 
-It mostly matches |:make|, with some key differences explained in
-|make-async-differences|.
+|make.nvim| is a package that provides a replacement for the built-in |:make|
+command with better integration with the rest of Neovim's new features.
 
-For changes, see |make-async-news.txt|.
+Aside from the new features listed at |make.nvim-features|, it mostly matches
+the built-in |:make|, with some key differences explained in
+|make.nvim-differences-to-:make|.
+
+See |make.nvim-usage| for details on how to use this package.
+
+For changes, see |make.nvim-news.txt|.
 
 Important package links are as follows:
 - License (MIT): MIT, see the `LICENSE` file in the repo for the full copy
-- Repository: https://github.com/madebyly/make-async
+- Repository: https://github.com/madebyly/make.nvim
 
 
 ==============================================================================
-REQUIREMENTS                                         *make-async-requirements*
+FEATURES                                                  *make.nvim-features*
+
+
+This package provides the following features:
+- a replacement for the |:make| command that populates a |quickfix| list
+  with results, allowing for the usual ease of navigation between source
+  files that quickfix lists provide normally;
+- integration with Neovim's LSP support, allowing this package's provided
+  |make.nvim-api-make| to run for a specific open LSP workspace with the
+  correct |makeprg| and related options;
+- support for long-running |makeprg|s such as `tsc`, refreshing and
+  populating quickfix list contents with the output such that one can have a
+  continuous feed of compiler output that can be navigated through in-editor.
+
+
+==============================================================================
+REQUIREMENTS                                          *make.nvim-requirements*
 
 This package requires the following:
 
@@ -39,41 +58,41 @@ This package requires the following:
 
 
 ==============================================================================
-INSTALLATION & CONFIGURATION                         *make-async-installation*
+INSTALLATION & CONFIGURATION                          *make.nvim-installation*
 
 Install this package like any other Neovim package.
 
 An example installation via the built-in |vim.pack.add|:
 
 >lua
-    vim.pack.add({ 'https://github.com/madebyly/make-async' })
+    vim.pack.add({ 'https://github.com/madebyly/make.nvim' })
 <
 
 
 ==============================================================================
-USAGE                                                       *make-async-usage*
+USAGE                                                        *make.nvim-usage*
 
-The package can be used by calling the provided `make_async` function in your
+The package can be used by calling the provided `make` function in your
 Lua scripts.
 
 Doing so runs |makeprg| almost exactly as it would when run via |:make|,
 taking into account almost all the same configuration options and
-considerations as the built-in would, see |make-async-differences| for info.
+considerations as the built-in would, see |make.nvim-differences| for info.
 
 Some useful ways this can be called are noted below:
 
 >lua
-    local plugin = require('make-async')
+    local plugin = require('make')
 
-    -- Defines a command `MakeAsync` that can be called like `:make`,
-    -- allowing you to do `:MakeAsync <compiler command args>` directly.
+    -- Defines a command `Make` that can be called like `:make`,
+    -- allowing you to do `:Make <compiler command args>` directly.
     vim.api.nvim_create_user_command(
-      'MakeAsync',
+      'Make',
       function(opt)
-        plugin.make_async(opt.args)
+        plugin.make(opt.args)
       end,
       {
-        desc = 'Runs `make_async` with the given arguments.',
+        desc = 'Runs `make.nvim` with the given arguments.',
         nargs = '*',
       }
     )
@@ -85,14 +104,16 @@ Some useful ways this can be called are noted below:
       'n',
       '<leader>lhs', -- replace with your desired keybind
       function()
+        local makeprg = plugin.get_makeprg()
+
         local args = vim.fn.input({
-          prompt = 'Enter arguments for `:make`',
+          prompt = string.format('Enter arguments for `%s`', makeprg),
         })
 
-        plugin.make_async(args)
+        plugin.make(args)
       end,
       {
-        desc = 'Runs `make_async` with the given arguments.'
+        desc = 'Runs `make.nvim` with the given arguments.'
       }
     )
 
@@ -101,8 +122,8 @@ Some useful ways this can be called are noted below:
       callback = function()
         -- ...your logic here...
       end,
-      pattern = 'make-async',
-      desc = 'Runs only when `make-async` runs',
+      pattern = 'make.nvim',
+      desc = 'Runs only when `make.nvim` runs',
     })
 
     -- Likewise, `autocmd`s that would've already ran on `make` will still run
@@ -111,36 +132,54 @@ Some useful ways this can be called are noted below:
         -- ...your logic here...
       end,
       pattern = 'make',
-      desc = 'Runs when `make-async` or `:make` are run'
+      desc = 'Runs when `make.nvim` or `:make` are run'
     })
 <
 
 ==============================================================================
-API                                                           *make-async-api*
+API                                                            *make.nvim-api*
 
 All functionality provided by this package is as follows:
 
-`make_async({make_args})`                          *make-async-api-make_async*
+`make(args)`                                              *make.nvim-api-make*
     Runs your |compiler| asynchronously, populating a |quickfix| list with
     the output of the command as it runs.
 
     Has nearly all the same considerations as |:make|, see package help for
-    details |make-async|.
+    details |make.nvim|.
 
-    `make_args` is passed directly to the compiler command after a space,
-    similar to how |:make| does it.
+    `args` is passed directly to the compiler command after a space,
+    similar to how |:make| does it, so be sure to delimit arguments properly.
+
+    Example of `args` for invoking `cargo` to build the release target:
+
+>lua
+    make("build --release")
+<
 
     Attributes: ~
         Available since: 0.1.0-alpha
 
     Parameters: ~
-      • {make_args}  (`string`) Arguments to pass to the compiler command as a
-                              `string`. This is passed directly to the
+      • {make_args}  (|string|) Arguments to pass to the compiler command as a
+                              |string|. This is passed directly to the
                               compiler command after a space, similar to how
                               |:make| does it.
 
 
-`make-async`                                  *make-async-api-autocmd-pattern*
+`get_makeprg()`                                    *make.nvim-api-get_makeprg*
+    Returns the |makeprg| that will be invoked when running |:make| or
+    |make.nvim-api-make|, or `nil` if it couldn't be determined or isn't set.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+    Returns: ~
+      A |string| containing the |makeprg| command, or |nil| if none could be
+      found.
+
+
+`make.nvim`                                    *make.nvim-api-autocmd-pattern*
     This pattern can be matched against when writing |autocmd|s.
 
     Attributes: ~
@@ -148,7 +187,7 @@ All functionality provided by this package is as follows:
 
 
 ==============================================================================
-DIFFERENCES TO |:make|                                *make-async-differences*
+DIFFERENCES TO |:make|                        *make.nvim-differences-to-:make*
 
 While the functionality provided by this package tries its best to match how
 the |:make| built-in command would, it differs in some key ways that
@@ -169,23 +208,23 @@ shouldn't affect most use cases:
   to manually write them yourself;
 - |QuickFixCmdPost| and |QuickFixCmdPre| include an additional pattern that
   can be matched against to only react to this package's functionality,
-  |make-async-api-autocmd-pattern|.
+  |make.nvim-api-autocmd-pattern|.
 
 
 ==============================================================================
-DEVELOPMENT                                           *make-async-development*
+DEVELOPMENT                                            *make.nvim-development*
 
 All package development occurs in the repository hosted at the repository link
-provided in the introduction |make-async-introduction|.
+provided in the introduction |make.nvim-introduction|.
 
 If you want to contribute, check out the repository and the
 `CONTRIBUTING.rst` file to learn more about how.
 
 
 ==============================================================================
-TROUBLESHOOTING                                   *make-async-troubleshooting*
+TROUBLESHOOTING                                    *make.nvim-troubleshooting*
 
-As explained in |make-async-differences|, this package relies on the same
+As explained in |make.nvim-differences|, this package relies on the same
 things that the built-in |:make| command does, and, since it redirects
 compiler command output to a quickfix list, also relies on the same things
 that quickfix-related functionality does.
@@ -195,7 +234,7 @@ This also means that this package breaks in the same ways that those would.
 In general, documentation on |:make| should apply to this command, see
 `:h :make`, as well as documentation on |quickfix|, see `:h quickfix`.
 Ignore the parts of these docs that match the stuff listed in
-|make-async-differences|.
+|make.nvim-differences|.
 
 Some common issues involve |compiler| and |quickfix| options not being set as
 expected for the buffer |filetype| you're working on.
@@ -209,7 +248,7 @@ In particular, pay attention to the following options:
 If |makeprg| isn't set properly, check that you've set it up properly and
 that you've run the plugin within the correct context, such as the buffer
 you expect to be built by |makeprg|. An example is running the provided
-function `make_async` while editing a Rust file buffer in order to invoke
+function `make` while editing a Rust file buffer in order to invoke
 `cargo`.
 
 You may also need to run |:compiler| in order to set the correct compiler
@@ -220,13 +259,13 @@ If the quickfix list isn't formatted correctly, double-check your
 |errorformat| and |quickfixtextfunc| options and ensure they're set to
 handle output from the command set up in |makeprg|.
 
-Sometimes, it may be as simple as you running |make-async-api-make_async| in
+Sometimes, it may be as simple as you running |make.nvim-api-make| in
 the wrong |pwd|. Be sure you're using the function in the same places you
 would use the built-in |:make| command.
 
 If the above doesn't help, or the error originates from the plugin's code,
 open an issue on the repository linked in the introduction
-|make-async-introduction|.
+|make.nvim-introduction|.
 
 
 
