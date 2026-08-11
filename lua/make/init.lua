@@ -106,7 +106,13 @@ end
 local AUTOCMD_PATTERNS = { 'make', 'make-async' }
 
 -- Exists only to run the appropriate `autocmd`s once async compilation is complete and the quickfix list is populated.
-local function on_make_async_exit()
+--
+-- All parameters are detailed in Neovim's official docs for |job-control| under |on_exit|.
+--
+-- @param job_id     string
+-- @param exit_code  string
+-- @param event_type string
+local function on_make_async_exit(job_id, exit_code, event_type)
   vim.schedule(function()
     vim.api.nvim_exec_autocmds('QuickFixCmdPost', {
       pattern = AUTOCMD_PATTERNS,
@@ -115,8 +121,7 @@ local function on_make_async_exit()
 end
 
 -- @class (exact) Make
--- @field setup function Runs `:make` asynchronously
--- @field make_async function Runs `:make` asynchronously
+-- @field make  function Runs `:make` asynchronously
 local M = {}
 
 -- Runs something similar to the built-in `:make` asynchronously, feeding into a quickfix list while compiling.
@@ -129,7 +134,7 @@ local M = {}
 -- Further help can be found in the official documentation of this package, see `:h make-async`
 --
 -- @param make_args string Arguments to append to `:make` as a string. This is passed directly to `makeprg`, so space
---                         out arguments accordingly as youl would when running the command on the command line.
+--                         out arguments accordingly as you would when running the command on the command line.
 M.make = function(make_args)
   local buffer_id = vim.api.nvim_get_current_buf()
 
@@ -176,7 +181,12 @@ M.make = function(make_args)
   -- a qflist in-between these two calls.
   local qflist_number = vim.fn.getqflist({ nr = '$' }).nr
 
-  local function output_handler(_, data, _)
+  -- See |job-control| -> |job-control-usage| for details on parameter specifics in Neovim's official help files.
+  --
+  -- @param job_id string
+  -- @param data string[]
+  -- @param stream_name string
+  local function output_handler(job_id, data, stream_name)
     handle_make_async_output(cmd, data, qflist_number, quickfixtextfunc, errorformat)
   end
 

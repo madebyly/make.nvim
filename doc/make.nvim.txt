@@ -161,10 +161,10 @@ All functionality provided by this package is as follows:
         Available since: 0.1.0-alpha
 
     Parameters: ~
-      • {make_args}  (|string|) Arguments to pass to the compiler command as a
-                              |string|. This is passed directly to the
-                              compiler command after a space, similar to how
-                              |:make| does it.
+      • {args}  (|string|) Arguments to pass to the compiler command as a
+                         |string|. This is passed directly to the
+                         compiler command after a space, similar to how
+                         |:make| does it.
 
 
 `get_makeprg()`                                    *make.nvim-api-get_makeprg*
