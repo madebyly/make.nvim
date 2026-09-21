@@ -2,13 +2,14 @@ local LOG_PREFIX = 'make.nvim'
 
 -- Internal notification wrapper that prepends useful plugin context so the user knows to blame this plugin.
 --
--- @param message string Message to send in the notification.
--- @param level vim.log.levels Log level to send the notification under. One of the values from |vim.log.levels|
+--- @param message string Message to send in the notification.
+--- @param level vim.log.levels Log level to send the notification under. One of the values from `vim.log.levels`
+--- @see vim.log.levels
 local function notify(message, level)
   vim.notify(LOG_PREFIX .. ': ' .. message, level)
 end
 
--- @enum OptionScopes
+--- @enum OptionScopes
 --
 -- Scopes which an option can be defined in and read from.
 --
@@ -21,10 +22,11 @@ local OPTION_SCOPES = {
 -- Gets the most relevant value of the provided option, searching in the given scope, normalizing the return value such
 -- that it's either the option's value or `nil` in all cases where the value isn't set.
 --
--- @param option string Name of the option to get the value of, like `'makeprg'`.
--- @param scopes OptionScopes Scope to look in to retrieve the option value.
--- @param buffer_id? integer ID of the buffer to pull the option value from if |OptionScopes.local| is given as `scope`.
--- @return string|nil The option's value, or nil if it wasn't found in any scope.
+--- @param option string Name of the option to get the value of, like `'makeprg'`.
+--- @param scope OptionScopes Scope to look in to retrieve the option value.
+--- @param buffer_id? number ID of the buffer to pull the option value from if `OptionScopes.local` is given as `scope`.
+---  @see OptionScopes
+--- @return string|nil The option's value, or nil if it wasn't found in any scope.
 local function do_get_most_relevant_option_value(option, scope, buffer_id)
   local option_value = nil
 
@@ -58,10 +60,11 @@ end
 
 -- Gets the most relevant value of the provided option, searching in the given scopes.
 --
--- @param option string Name of the option to get the value of, like `'makeprg'`.
--- @param scopes OptionScopes[] Scopes to look in to retrieve the option value.
--- @param buffer_id? integer ID of the buffer to pull the option value from if |OptionScopes.local| is given in `scopes`.
--- @return string|nil The option's value, or nil if it wasn't found in any scope.
+--- @param option string Name of the option to get the value of, like `'makeprg'`.
+--- @param scopes OptionScopes[] Scopes to look in to retrieve the option value.
+--- @param buffer_id? number ID of the buffer to pull the option value from if `OptionScopes.local` is given in `scopes`.
+---  @see OptionScopes
+--- @return string|nil The option's value, or nil if it wasn't found in any scope.
 local function get_most_relevant_option_value(option, scopes, buffer_id)
   local option_value = nil
 
@@ -85,19 +88,18 @@ end
 
 -- Handles compiler command output, filling up the appropriate quick fix list with the output correctly formatted.
 --
--- @param cmd string The command behind the current invocation.
--- @param output string[] Output from the command (errors or otherwise) as an array since commands might send many.
--- @param list_number integer Number of the quickfix list to send results to.
--- @param quickfixtextfunc function Quick fix text function, see `:h quickfixtextfunc` for details.
--- @param errorformat string Error format parsing string, see `:h errorformat` for details.
-local function handle_make_async_output(cmd, output, list_number, quickfixtextfunc, errorformat)
-  -- Since this is a fast context, we have to schedule it to run later.
+--- @param cmd string The command behind the current invocation.
+--- @param output string[] Output from the command (errors or otherwise) as an array since commands might send many.
+--- @param quickfix_list_nr number Number of the quickfix list to send results to.
+--- @param quickfixtextfunc string|nil Quick fix text function, see `:h quickfixtextfunc` for details.
+--- @param errorformat string|nil Error format parsing string, see `:h errorformat` for details.
+local function handle_make_async_output(cmd, output, quickfix_list_nr, quickfixtextfunc, errorformat)
   vim.schedule(function()
     vim.fn.setqflist({}, 'a', {
       cmd = cmd,
       lines = output,
       quickfixtextfunc = quickfixtextfunc,
-      nr = list_number,
+      nr = quickfix_list_nr,
       efm = errorformat,
     })
   end)
@@ -107,12 +109,11 @@ local AUTOCMD_PATTERNS = { 'make', 'make-async' }
 
 -- Exists only to run the appropriate `autocmd`s once async compilation is complete and the quickfix list is populated.
 --
--- All parameters are detailed in Neovim's official docs for |job-control| under |on_exit|.
+-- All parameters are detailed in Neovim's official docs for `:h job-control` under `on_exit`.
 --
--- @param job_id     string
--- @param exit_code  string
--- @param event_type string
-local function on_make_async_exit(job_id, exit_code, event_type)
+--- @param job_id      number
+--- @param exit_code   number
+local function on_make_async_exit(job_id, exit_code, _)
   vim.schedule(function()
     vim.api.nvim_exec_autocmds('QuickFixCmdPost', {
       pattern = AUTOCMD_PATTERNS,
@@ -120,8 +121,8 @@ local function on_make_async_exit(job_id, exit_code, event_type)
   end)
 end
 
--- @class (exact) Make
--- @field make  function Runs `:make` asynchronously
+--- @class (exact) Make
+--- @field get_makeprg function Gets the `makeprg` that will be run when `make` is invoked.
 local M = {}
 
 -- Runs something similar to the built-in `:make` asynchronously, feeding into a quickfix list while compiling.
@@ -133,8 +134,8 @@ local M = {}
 --
 -- Further help can be found in the official documentation of this package, see `:h make-async`
 --
--- @param make_args string Arguments to append to `:make` as a string. This is passed directly to `makeprg`, so space
---                         out arguments accordingly as you would when running the command on the command line.
+--- @param make_args string Arguments to append to `:make` as a string. This is passed directly to `makeprg`, so space
+--                          out arguments accordingly as you would when running the command on the command line.
 M.make = function(make_args)
   local buffer_id = vim.api.nvim_get_current_buf()
 
@@ -156,6 +157,7 @@ M.make = function(make_args)
   -- We perform our own argument substitution in lieu of this by concatenating the command with the arguments directly,
   -- so we remove this from the command since it'd otherwise fail to run if kept in, along with any trailing spaces
   -- that would've been left behind.
+  --- @type string
   local cmd = vim.fn.expandcmd(makeprg):gsub('[ \t]+%$%*$', '') .. ' ' .. make_args
 
   -- Users expect this to be run in their quickfix lists, so retrieve this and pass it along.
@@ -177,17 +179,16 @@ M.make = function(make_args)
     nr = '$',
   })
 
-  -- The above doesn't return the qflist number, so we have to get it manually and hope that nothing else creates
-  -- a qflist in-between these two calls.
-  local qflist_number = vim.fn.getqflist({ nr = '$' }).nr
+  -- The above doesn't return the qflist number directly due to the `nr` argument so we have to get it manually and
+  -- hope that nothing else creates a quickfix list in-between these two calls.
+  --- @type number
+  local quickfix_list_nr = vim.fn.getqflist({ nr = '$' }).nr
 
-  -- See |job-control| -> |job-control-usage| for details on parameter specifics in Neovim's official help files.
+  --- See `:h job-control` -> `job-control-usage` for details on parameter specifics in Neovim's official help files.
   --
-  -- @param job_id string
-  -- @param data string[]
-  -- @param stream_name string
-  local function output_handler(job_id, data, stream_name)
-    handle_make_async_output(cmd, data, qflist_number, quickfixtextfunc, errorformat)
+  --- @param data string[]
+  local function output_handler(_, data, _)
+    handle_make_async_output(cmd, data, quickfix_list_nr, quickfixtextfunc, errorformat)
   end
 
   -- Specifically uses this form of `jobstart` with a cmd string in order to invoke it in the shell as `:make` would
@@ -200,7 +201,7 @@ end
 
 -- Gets the most relevant `makeprg` option value.
 --
--- @return string|nil The option's value, or nil if it wasn't found in any scope.
+--- @return string|nil The option's value, or nil if it wasn't found in any scope.
 M.get_makeprg = function()
   local buffer_id = vim.api.nvim_get_current_buf()
 
