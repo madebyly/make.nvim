@@ -1,5 +1,44 @@
 local LOG_PREFIX = 'make.nvim'
 
+--- @alias JobId number
+--- @alias QuickfixListId number
+--
+--- @class (exact) JobData
+--- @field quickfix_list_nr QuickfixListId The number of the quickfix list output is being piped to.
+--- @field job_id JobId ID of the job whose output is being piped to this list.
+--- @field is_complete boolean Whether or not the command is finished.
+--- @field status_code number|nil The status code of the job command when it finished or nil if it isn't finished.
+--- @field command string The full command of the job.
+--- @field path string The path to the file of the buffer that started the job.
+--
+--- @type table<JobId, JobData>
+local make_jobs = {}
+
+-- Used when `vim.g.make_nvim` configuration values aren't set
+--- @class (exact) Options
+--- @field character_incomplete string
+--- @field character_error string
+--- @field character_ok string
+---
+--- @type Options
+local default_options = {
+  character_incomplete = '…',
+  character_error = '❌',
+  character_ok = '✓'
+}
+
+--- @param key 'character_incomplete' | 'character_error' | 'character_ok'
+---  @see Options
+---
+--- @return string The configuration value as set by the user, or the default value for it if none is set.
+local function get_configuration_value(key)
+  if vim.g.make_nvim == nil or vim.g.make_nvim[key] == nil then
+    return default_options[key]
+  end
+
+  return vim.g.make_nvim[key]
+end
+
 -- Internal notification wrapper that prepends useful plugin context so the user knows to blame this plugin.
 --
 --- @param message string Message to send in the notification.
@@ -105,7 +144,8 @@ local function handle_make_async_output(cmd, output, quickfix_list_nr, quickfixt
   end)
 end
 
-local AUTOCMD_PATTERNS = { 'make', 'make-async' }
+-- TODO: document this change since the scope is different now
+local AUTOCMD_PATTERNS = { 'make-async' }
 
 -- Exists only to run the appropriate `autocmd`s once async compilation is complete and the quickfix list is populated.
 --
@@ -114,6 +154,9 @@ local AUTOCMD_PATTERNS = { 'make', 'make-async' }
 --- @param job_id      number
 --- @param exit_code   number
 local function on_make_async_exit(job_id, exit_code, _)
+  make_jobs[job_id].is_complete = true
+  make_jobs[job_id].status_code = exit_code
+
   vim.schedule(function()
     vim.api.nvim_exec_autocmds('QuickFixCmdPost', {
       pattern = AUTOCMD_PATTERNS,
@@ -123,6 +166,9 @@ end
 
 --- @class (exact) Make
 --- @field get_makeprg function Gets the `makeprg` that will be run when `make` is invoked.
+--- @field make function Runs `:make` asynchronously, piping output from the command into a dedicated quickfix list.
+--- @field view function Lists all currently running `:make` jobs, opening the related quickfix list on selection.
+--- @field kill function Lists `:make` jobs and stops them when selected.
 local M = {}
 
 -- Runs something similar to the built-in `:make` asynchronously, feeding into a quickfix list while compiling.
@@ -168,8 +214,7 @@ M.make = function(make_args)
   local errorformat =
     get_most_relevant_option_value('errorformat', { OPTION_SCOPES.buffer, OPTION_SCOPES.global }, buffer_id)
 
-  -- This acts like `:make`, so this also has to send the command pattern over such that any existing autocmds would
-  -- match as expected, passing in a custom pattern that can be matched against if the user wants to.
+  -- `:make` would usually cause this autocmd event to fire so this has to replicate it with our own custom pattern.
   vim.api.nvim_exec_autocmds('QuickFixCmdPre', {
     pattern = AUTOCMD_PATTERNS,
   })
@@ -191,12 +236,20 @@ M.make = function(make_args)
     handle_make_async_output(cmd, data, quickfix_list_nr, quickfixtextfunc, errorformat)
   end
 
-  -- Specifically uses this form of `jobstart` with a cmd string in order to invoke it in the shell as `:make` would
-  vim.fn.jobstart(cmd, {
+  -- Specifically uses this form of `jobstart` with a cmd string in order to invoke it in the shell as `:make` would.
+  local job_id = vim.fn.jobstart(cmd, {
     on_stdout = output_handler,
     on_stderr = output_handler,
     on_exit = on_make_async_exit,
   })
+
+  make_jobs[job_id] = {
+    quickfix_list_nr = quickfix_list_nr,
+    job_id = job_id,
+    is_complete = false,
+    command = cmd,
+    path = vim.api.nvim_buf_get_name(0),
+  }
 end
 
 -- Gets the most relevant `makeprg` option value.
@@ -208,6 +261,77 @@ M.get_makeprg = function()
   local makeprg = get_most_relevant_option_value('makeprg', { OPTION_SCOPES.buffer, OPTION_SCOPES.global }, buffer_id)
 
   return makeprg
+end
+
+--- @return { choices: string[], job_data: JobData[] } | nil
+local function get_make_job_choices()
+  if vim.tbl_isempty(make_jobs) then
+    -- TODO: info log for no jobs active
+
+    return nil
+  end
+
+  local job_data = vim.tbl_values(make_jobs)
+
+  --- @type string[]
+  local choices = {}
+
+  for _, v in ipairs(job_data) do
+    local character_status_icon = get_configuration_value('character_incomplete')
+
+    if v.status_code ~= nil then
+      if v.status_code == 0 then
+        character_status_icon = get_configuration_value('character_ok')
+      else
+        character_status_icon = get_configuration_value('character_error')
+      end
+    end
+
+    table.insert(choices, string.format('%s | path: %s | cmd: %s', character_status_icon, v.path, v.command))
+  end
+
+  return { job_data = job_data, choices = choices }
+end
+
+M.view = function()
+  local data = get_make_job_choices()
+
+  if data == nil then
+    return
+  end
+
+  vim.ui.select(data.choices, {
+    prompt = 'Choose a job to view output for: ',
+  }, function(_, index)
+    if index == nil then
+      return
+    end
+
+    vim.cmd(string.format('%d%s', data.job_data[index].quickfix_list_nr, 'chistory'))
+  end)
+end
+
+M.kill = function()
+  local data = get_make_job_choices()
+
+  if data == nil then
+    return
+  end
+
+  vim.ui.select(data.choices, {
+    -- TODO: maybe explain that this will also remove easy way to access the quickfix list but will leave the list there
+    prompt = 'Choose a job to kill: ',
+  }, function(_, index)
+    if index == nil then
+      return
+    end
+
+    local job_id = data.job_data[index].job_id
+
+    make_jobs[job_id]:remove()
+
+    vim.fn.jobstop(job_id)
+  end)
 end
 
 return M
