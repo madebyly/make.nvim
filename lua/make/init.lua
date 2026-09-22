@@ -219,9 +219,12 @@ M.make = function(make_args)
     pattern = M.QUICKFIX_EVENT_PATTERNS,
   })
 
+  local path = vim.api.nvim_buf_get_name(0)
+
   -- Need to make a new qflist to store the results in so that old ones aren't clobbered
   vim.fn.setqflist({}, ' ', {
     nr = '$',
+    title = string.format('cmd: %s | path: %s', cmd, path)
   })
 
   -- The above doesn't return the qflist number directly due to the `nr` argument so we have to get it manually and
@@ -248,7 +251,7 @@ M.make = function(make_args)
     job_id = job_id,
     is_complete = false,
     command = cmd,
-    path = vim.api.nvim_buf_get_name(0),
+    path = path,
   }
 end
 
