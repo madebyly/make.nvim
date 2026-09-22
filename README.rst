@@ -1,152 +1,184 @@
 .. default-role:: code
 
 
-##################################
- Fully integrated `:make` for Neovim
-##################################
+Drop-in asynchronous `:make` replacement for Neovim
+===================================================
+``make.nvim`` is a package that provides a replacement for the built-in ``:make`` that aims to provide an asynchronous drop-in replacement for it.
 
-`make.nvim` is a package that provides a replacement for the built-in `:make` command with better integration with the rest of Neovim's new features.
+Full documentation is available in the help files, see ``:h make.nvim``, or the help file directly here `make.nvim.txt <doc/make.nvim.txt>`_.
 
-Full documentation is available in the help files, see `:h make.nvim`, or the help file directly here `make.nvim.txt <doc/make.nvim.txt>`_.
+This README is a shallow copy of the documentation contained within designed to make it easy to know how to get started and how to contribute if desired.
 
 
-##################################
- Features
-##################################
+Features
+========
 This package provides the following features:
-- a replacement for the |:make| command that populates a |quickfix| list
-  with results, allowing for the usual ease of navigation between source
-  files that quickfix lists provide normally;
-- integration with Neovim's LSP support, allowing this package's provided
-  |make.nvim-api-make| to run for a specific open LSP workspace with the
-  correct |makeprg| and related options;
-- support for long-running |makeprg|\s such as `tsc`, refreshing and
-  populating quickfix list contents with the output such that one can have a
-  continuous feed of compiler output that can be navigated through in-editor.
+- an asynchronous replacement for the ``:make`` command that allows you to continue using the editor while compilers are running in the background;
+- facilities to navigate quickfix lists being populated by these asynchronous compiler jobs and to manage them.
 
 
 Requirements
-############
+============
 
 This package requires the following:
 
-- Neovim, version >= 0.12.0
+- ``neovim`` version >= 0.12.0
 
 
-Installation
-############
-
+Installation and Configuration
+==============================
 Install this package like any other Neovim package.
 
-An example installation via the built-in `vim.pack.add`:
+An example installation via the built-in ``vim.pack.add``:
 
 .. code:: lua
-    vim.pack.add({ 'https://github.com/madebyly/make.nvim' })
+   vim.pack.add({ 'https://github.com/madebyly/make.nvim' })
+
+The package works out of the box with no further configuration, following the usual requirements for ``:make`` to work, see ``make.nvim-troubleshooting`` and ``make.nvim-differences-to-:make`` for details.
+
+You can, however, customize some visual aspects of the plugin if you'd like.
+
+This plugin checks the global variable ``vim.g.make_nvim`` for replacements for the strings used when viewing jobs with ``view`` (see ``:h make.nvim-usage``), which are used as icons for e.g. what state a compiler job is in.
+
+It expects it to be a dictionary where the keys are one of the following:
+- ``icon_incomplete``
+- ``icon_error``
+- ``icon_ok``
+
+The values are strings that will be used as "icons" for the state of the compilation job in the view list.
+
+These can be set at anytime and the plugin will take the latest value set, if any.
+
+An example configuration is below:
+
+.. code:: lua
+   vim.g.make_nvim = {
+     icon_incomplete = '…',
+     icon_error = '❌',
+     icon_ok = '✓'
+   }
 
 
 Usage
-#####
+=====
+The package can be used by calling the provided `make` function in your Lua scripts.
 
-The package can be used by calling the provided `make_async` function in your
-Lua scripts.
+Doing so runs ``makeprg`` almost exactly as it would when run via ``:make``, taking into account almost all the same configuration options and considerations as the built-in would.
 
-Doing so runs |makeprg| almost exactly as it would when run via |:make|,
-taking into account almost all the same configuration options and
-considerations as the built-in would, see |make-async-differences| for info.
+See ``:h make.nvim-differences`` for info on the differences it has.
+
+Notably, this emits ``QuickFixCmdPre`` and ``QuickFixCmdPost`` with different patterns, details of which can be found at ``make.nvim-api-make-autocmd-pattern``.
 
 Some useful ways this can be called are noted below:
 
 .. code:: lua
-    local plugin = require('make-async')
+   local plugin = require('make')
 
-    -- Defines a command `MakeAsync` that can be called like `:make`,
-    -- allowing you to do `:MakeAsync <compiler command args>` directly.
-    vim.api.nvim_create_user_command(
-      'MakeAsync',
-      function(opt)
-        plugin.make_async(opt.args)
-      end,
-      {
-        desc = 'Runs `make_async` with the given arguments.',
-        nargs = '*',
-      }
-    )
+   -- Defines a command `Make` that can be called like `:make`,
+   -- allowing you to do `:Make <compiler command args>` directly.
+   vim.api.nvim_create_user_command(
+     'Make',
+     function(opt)
+       plugin.make(opt.args)
+     end,
+     {
+       desc = 'Runs `make.nvim` with the given arguments.',
+       nargs = '*',
+     }
+   )
 
-    -- Sets up a keybinding, allowing you to run the command quickly while
-    -- still allowing for compile command customization by prompting you
-    -- for input that will be passed as args to the underlying command.
-    vim.keymap.set(
-      'n',
-      '<leader>lhs', -- replace with your desired keybind
-      function()
-        local args = vim.fn.input({
-          prompt = 'Enter arguments for `:make`',
-        })
+   -- Sets up a keybinding, allowing you to run the command quickly while
+   -- still allowing for compile command customization by prompting you
+   -- for input that will be passed as args to the underlying command.
+   vim.keymap.set(
+     'n',
+     'keybind', -- replace with your desired keybind
+     function()
+       -- This is provided for convenience since |makeprg| can be sourced
+       -- from a number of places.
+       local makeprg = plugin.get_makeprg()
 
-        plugin.make_async(args)
-      end,
-      {
-        desc = 'Runs `make_async` with the given arguments.'
-      }
-    )
+       local args = vim.fn.input({
+         prompt = string.format('Enter arguments for `%s`: ', makeprg),
+       })
 
-    -- `autocmd`s can be set up to run only when this package runs
-    vim.api.nvim_create_autocmd('QuickFixCmdPost', {
-      callback = function()
-        -- ...your logic here...
-      end,
-      pattern = 'make-async',
-      desc = 'Runs only when `make-async` runs',
-    })
+       if args:len() == 0 then
+         return
+       end
 
-    -- Likewise, `autocmd`s that would've already ran on `make` will still run
-    vim.api.nvim_create_autocmd('QuickFixCmdPost', {
-      callback = function()
-        -- ...your logic here...
-      end,
-      pattern = 'make',
-      desc = 'Runs when `make-async` or `:make` are run'
-    })
+       plugin.make(args)
+     end,
+     {
+       desc = 'Runs `make.nvim` with the given arguments.'
+     }
+   )
 
+   -- `autocmd`s for both `QuickFixCmdPre` and `QuickFixCmdPost` can be set
+   -- up to run when this package's functions run.
+   vim.api.nvim_create_autocmd('QuickFixCmdPre', {
+     callback = function()
+       -- ...your logic here...
+     end,
+     -- Can also use the pattern as a string directly 'make.nvim'
+     pattern = plugin.QUICKFIX_EVENT_PATTERNS,
+     desc = 'Runs only when `make.nvim:make` runs',
+   })
 
-Differences to `:make`
-###########
+   vim.api.nvim_create_autocmd('QuickFixCmdPost', {
+     callback = function()
+       -- ...your logic here...
+     end,
+     pattern = plugin.QUICKFIX_EVENT_PATTERNS
+   })
 
-While the functionality provided by this package tries its best to match how the `:make` built-in command would, it differs in some key ways that shouldn't affect most use cases:
+The plugin provides a ``view`` function that allows you to view all current and previous compiler jobs started via this plugin, setting their quickfix list as the current one on selection.
 
-- all output from executing the compiler command is sent over to a `quickfix` list by default where the user can handle output from the command later;
-- `makeencoding` is ignored completely due to how output is routed;
-- `:cnext` and `:cprevious` do nothing because of how output is routed, with navigating between errors being handled the same way you would navigate a `quickfix` list;
-  - this doesn't work as-is on Windows, so this should result in no change to your workflow there.
-- `makeef` is ignored because of how output is routed, and no error file is written to that can be viewed later or persisted as `makeef` would allow;
-- `shellpipe` is ignored due to how output is routed;
-- changed buffers will never be written, ignoring `autowrite`, requiring you to manually write them yourself;
-- `QuickFixCmdPost` and `QuickFixCmdPre` include an additional pattern that can be matched against to only react to this package's functionality, `make-async-api-autocmd-pattern`.
+This function emits a ``User`` ``autocmd`` event with the patterns exposed via the ``VIEW_EVENT_PATTERNS`` field on the plugin module once a selection is made, allowing you to react to the quickfix list now changing.
+
+This pattern is detailed at ``make.nvim-api-view-autocmd-pattern``.
+
+This can be used as follows:
+
+.. code:: lua
+   -- ...continuing from the previous example...
+   vim.keymap.set('n', 'keybind', function()
+     make.view()
+   end)
+
+   vim.api.nvim_create_autocmd('User', {
+     pattern = make.VIEW_EVENT_PATTERNS,
+     callback = function(event)
+       vim.cmd('copen')
+     end,
+   })
+
+This leverages ``vim.ui.select``, so anything you register as the handler for that will be used to preview the choices as well.
+
+To kill any long-running compiler jobs, use the ``kill`` function, which similarly displays a list of jobs, filtered to only show those that are still running, stopping their associated job when selected:
+
+.. code:: lua
+   -- ...continuing from the previous example...
+   vim.keymap.set('n', 'keybind', function()
+     plugin.kill()
+   end)
+
+This also displays the choices via ``vim.ui.select`` as ``view`` does.
 
 
 Development
-###########
-
+===========
 See `CONTRIBUTING.rst <CONTRIBUTING.rst>`_ for more details.
 
 
 Troubleshooting
-###############
+===============
+See the ``TROUBLESHOOTING`` section in the main help file `make.nvim.txt <doc/make.nvim.txt>`_ for common problems and their fixes.
 
-See the `TROUBLESHOOTING` section in the main help file `make.nvim.txt <doc/make.nvim.txt>`_ for common problems and their fixes.
-
-You can view this file directly in Neovim by running the command `:h make-async`.
-
-Yes, I'm lazy to copy it here.
-
-Unlike the above installation steps, this should only be relevant once you start using it and need help, in which case the help file has it all.
+You can view this file directly in Neovim by running the command ``:h make.nvim``.
 
 
 Changes
-#######
-
-See the main `news.txt` file `news.txt <doc/news.txt>`_ for a full list of changes.
-
-Similar reasons to the troubleshooting section as to why this section isn't expanded in the `README`, except changes are also listed on each release with the same content as what you'd find in the news file.
+=======
+See the main ``news.txt`` file `news.txt <doc/news.txt>`_ for a full list of changes when a new version is released.
 
 

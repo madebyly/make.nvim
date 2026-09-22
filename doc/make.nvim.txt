@@ -1,4 +1,4 @@
-*make.nvim.txt*                            Fully integrated |:make| for Neovim
+*make.nvim.txt*            Drop-in asynchronous |:make| replacement for Neovim
 
 ==============================================================================
 TABLE OF CONTENTS                                              *make.nvim-toc*
@@ -49,7 +49,7 @@ REQUIREMENTS                                          *make.nvim-requirements*
 
 This package requires the following:
 
-- Neovim, version >= 0.12.0
+- `neovim` version >= 0.12.0
 
 
 ==============================================================================
