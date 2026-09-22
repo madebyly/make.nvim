@@ -149,9 +149,11 @@ end
 --- @field make function Runs `:make` asynchronously, piping output from the command into a dedicated quickfix list.
 --- @field view function Lists all currently running `:make` jobs, opening the related quickfix list on selection.
 --- @field kill function Lists `:make` jobs and stops them when selected.
+--- @field VIEW_EVENT_PATTERNS string[] Patterns that can be matched against for `User` events for when a selection has been made after calling `view`.
 --- @field QUICKFIX_EVENT_PATTERNS string[] Patterns that can be matched against for when `make` is run.
 local M = {}
 
+M.VIEW_EVENT_PATTERNS = { 'make.nvim:view' }
 M.QUICKFIX_EVENT_PATTERNS = { 'make.nvim:make' }
 
 -- Exists only to run the appropriate `autocmd`s once async compilation is complete and the quickfix list is populated.
@@ -311,6 +313,10 @@ M.view = function()
     end
 
     vim.cmd(string.format('%d%s', data.job_data[index].quickfix_list_nr, 'chistory'))
+
+    vim.api.nvim_exec_autocmds('User', {
+      pattern = M.VIEW_EVENT_PATTERNS
+    })
   end)
 end
 
