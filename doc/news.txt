@@ -22,6 +22,42 @@ ADDED
   implementation |make-async-api-make_async|
 
 
+==============================================================================
+Version 0.1.0-alpha.2 - 2026-09-22             *make-async-news-0.1.0-alpha.2*
+
+A release aimed at enhancing the asynchronous aspect of the plugin, adding in
+various APIs designed around managing the various quickfix lists created from
+them, and cleaning up |autocmd| events to better suit its more asynchronous
+nature.
+
+------------------------------------------------------------------------------
+ADDED
+
+- |make.nvim-api-view| to view all compiler jobs created by the plugin,
+  making the associated quickfix list active on selection;
+- new configuration values that can be set to change the "icons" used for
+  the list opened by `view`;
+- |make.nvim-api-kill| to view all currently running compiler jobs, killing
+  the job on selection;
+- |make.nvim-api-get_makeprg| to retrieve the same |makeprg| that will be run
+  once |make.nvim-make| is run.
+
+------------------------------------------------------------------------------
+CHANGED
+
+- separation of plugin |autocmd| event patterns from base |:make| patterns;
+- |QuickFixCmdPost| is fired after an asynchronous compiler job starts
+  instead of when it ends in order to better fit the asynchronous flow;
+- health checks that check specifically this plugin's additional
+  values now that it has some.
+
+------------------------------------------------------------------------------
+REMOVED
+
+- `make` is no longer sent as a pattern in both the |QuickFixCmdPre| and
+  |QuickFixCmdPost| events when |make.nvim-api-make| is run.
+
+
 
 
  vim:tw=78:noet:ft=help:norl:

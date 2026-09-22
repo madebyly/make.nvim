@@ -1,0 +1,412 @@
+*make.nvim.txt*            Drop-in asynchronous |:make| replacement for Neovim
+
+==============================================================================
+TABLE OF CONTENTS                                              *make.nvim-toc*
+
+1. INTRODUCTION ..................................... |make.nvim-introduction|
+2. REQUIREMENTS ..................................... |make.nvim-requirements|
+3. INSTALLATION & CONFIGURATION ..................... |make.nvim-installation|
+4. USAGE ................................................... |make.nvim-usage|
+5. API ....................................................... |make.nvim-api|
+6. DIFFERENCES TO |:make| ....................|make.nvim-differences-to-:make|
+7. DEVELOPMENT ....................................... |make.nvim-development|
+8. TROUBLESHOOTING ............................... |make.nvim-troubleshooting|
+
+
+==============================================================================
+INTRODUCTION                                          *make.nvim-introduction*
+
+
+|make.nvim| is a package that provides a replacement for the built-in |:make|
+that aims to provide an asynchronous drop-in replacement for it.
+
+Aside from the new features listed at |make.nvim-features|, it mostly matches
+the built-in |:make|, with some key differences explained in
+|make.nvim-differences-to-:make|.
+
+See |make.nvim-usage| for details on how to use this package.
+
+For changes, see |make.nvim-news.txt|.
+
+Important package links are as follows:
+- License (MIT): MIT, see the `LICENSE` file in the repo for the full copy
+- Repository: https://github.com/madebyly/make.nvim
+
+
+==============================================================================
+FEATURES                                                  *make.nvim-features*
+
+
+This package provides the following features:
+- an asynchronous replacement for the |:make| command that allows you to
+  continue using the editor while compilers are running in the background;
+- facilities to navigate quickfix lists being populated by these asynchronous
+  compiler jobs and to manage them.
+
+
+==============================================================================
+REQUIREMENTS                                          *make.nvim-requirements*
+
+This package requires the following:
+
+- `neovim` version >= 0.12.0
+
+
+==============================================================================
+INSTALLATION & CONFIGURATION                          *make.nvim-installation*
+
+Install this package like any other Neovim package.
+
+An example installation via the built-in |vim.pack.add|:
+
+>lua
+    vim.pack.add({ 'https://github.com/madebyly/make.nvim' })
+<
+
+The package works out of the box with no further configuration, following the
+usual requirements for |:make| to work, see |make.nvim-troubleshooting| and
+|make.nvim-differences-to-:make| for details.
+
+You can, however, customize some visual aspects of the plugin if you'd like.
+
+This plugin checks the global variable `vim.g.make_nvim` for replacements for
+the strings used when viewing jobs with `view` (see |make.nvim-usage|),
+which are used as icons for e.g. what state a compiler job is in.
+
+It expects it to be a dictionary where the keys are one of the following:
+- `icon_incomplete`
+- `icon_error`
+- `icon_ok`
+
+...and the values are strings that will be used as "icons" for the state of
+the compilation job in the view list.
+
+These can be set at anytime and the plugin will take the latest value set, if
+any.
+
+An example configuration is below:
+
+>lua
+    vim.g.make_nvim = {
+      icon_incomplete = '…',
+      icon_error = '❌',
+      icon_ok = '✓'
+    }
+<
+
+
+==============================================================================
+USAGE                                                        *make.nvim-usage*
+
+The package can be used by calling the provided `make` function in your
+Lua scripts.
+
+Doing so runs |makeprg| almost exactly as it would when run via |:make|,
+taking into account almost all the same configuration options and
+considerations as the built-in would.
+
+See |make.nvim-differences| for info on the differences it has.
+
+Notably, this emits |QuickFixCmdPre| and |QuickFixCmdPost| with different
+patterns, details of which can be found at
+|make.nvim-api-make-autocmd-pattern|.
+
+Some useful ways this can be called are noted below:
+
+>lua
+    local plugin = require('make')
+
+    -- Defines a command `Make` that can be called like `:make`,
+    -- allowing you to do `:Make <compiler command args>` directly.
+    vim.api.nvim_create_user_command(
+      'Make',
+      function(opt)
+        plugin.make(opt.args)
+      end,
+      {
+        desc = 'Runs `make.nvim` with the given arguments.',
+        nargs = '*',
+      }
+    )
+
+    -- Sets up a keybinding, allowing you to run the command quickly while
+    -- still allowing for compile command customization by prompting you
+    -- for input that will be passed as args to the underlying command.
+    vim.keymap.set(
+      'n',
+      'keybind', -- replace with your desired keybind
+      function()
+        -- This is provided for convenience since |makeprg| can be sourced
+        -- from a number of places.
+        local makeprg = plugin.get_makeprg()
+
+        local args = vim.fn.input({
+          prompt = string.format('Enter arguments for `%s`: ', makeprg),
+        })
+
+        if args:len() == 0 then
+          return
+        end
+
+        plugin.make(args)
+      end,
+      {
+        desc = 'Runs `make.nvim` with the given arguments.'
+      }
+    )
+
+    -- `autocmd`s for both `QuickFixCmdPre` and `QuickFixCmdPost` can be set
+    -- up to run when this package's functions run.
+    vim.api.nvim_create_autocmd('QuickFixCmdPre', {
+      callback = function()
+        -- ...your logic here...
+      end,
+      -- Can also use the pattern as a string directly 'make.nvim'
+      pattern = plugin.QUICKFIX_EVENT_PATTERNS,
+      desc = 'Runs only when `make.nvim:make` runs',
+    })
+
+    vim.api.nvim_create_autocmd('QuickFixCmdPost', {
+      callback = function()
+        -- ...your logic here...
+      end,
+      pattern = plugin.QUICKFIX_EVENT_PATTERNS
+    })
+<
+
+The plugin provides a `view` function that allows you to view all current
+and previous compiler jobs started via this plugin, setting their quickfix
+list as the current one on selection.
+
+This function emits a |User| |autocmd| event with the patterns exposed via the
+`VIEW_EVENT_PATTERNS` field on the plugin module once a selection is made,
+allowing you to react to the quickfix list now changing.
+
+This pattern is detailed at |make.nvim-api-view-autocmd-pattern|.
+
+This can be used as follows:
+
+>lua
+    -- ...continuing from the previous example...
+    vim.keymap.set('n', 'keybind', function()
+      make.view()
+    end)
+
+    vim.api.nvim_create_autocmd('User', {
+      pattern = make.VIEW_EVENT_PATTERNS,
+      callback = function(event)
+        vim.cmd('copen')
+      end,
+    })
+<
+
+This leverages |vim.ui.select|, so anything you register as the handler for
+that will be used to preview the choices as well.
+
+To kill any long-running compiler jobs, use the `kill` function, which
+similarly displays a list of jobs, filtered to only show those that are still
+running, stopping their associated job when selected:
+
+>lua
+    -- ...continuing from the previous example...
+    vim.keymap.set('n', 'keybind', function()
+      plugin.kill()
+    end)
+<
+
+This also displays the choices via |vim.ui.select| as `view` does.
+
+
+==============================================================================
+API                                                            *make.nvim-api*
+
+All functionality provided by this package is as follows:
+
+`make(args)`                                              *make.nvim-api-make*
+    Runs your |compiler| asynchronously, populating a |quickfix| list with
+    the output of the command as it runs.
+
+    Has nearly all the same considerations as |:make|, see package help for
+    details |make.nvim|.
+
+    `args` is passed directly to the compiler command after a space,
+    similar to how |:make| does it, so be sure to delimit arguments properly.
+
+    Example of `args` for invoking `cargo` to build the release target:
+
+>lua
+    make("build --release")
+<
+
+    Attributes: ~
+        Available since: 0.1.0-alpha
+
+    Parameters: ~
+      • {args}  (|string|) Arguments to pass to the compiler command as a
+                         |string|. This is passed directly to the
+                         compiler command after a space, similar to how
+                         |:make| does it.
+
+
+`view()`                                                  *make.nvim-api-view*
+    Displays a list of current or previously created compilation jobs, making
+    their associated |quickfix| list active on selection.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+
+`kill()`                                                  *make.nvim-api-kill*
+    Displays a list of currently running compilation jobs, stopping them on
+    selection.
+
+    See |jobstop| for details on how the termination process works.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+
+`get_makeprg()`                                    *make.nvim-api-get_makeprg*
+    Returns the |makeprg| that will be invoked when running |:make| or
+    |make.nvim-api-make|, or `nil` if it couldn't be determined or isn't set.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+    Returns: ~
+      A |string| containing the |makeprg| command, or |nil| if none could be
+      found.
+
+
+`QUICKFIX_EVENT_PATTERNS`              *make.nvim-api-quickfix-event-patterns*
+    This field contains all the patterns that will be emitted alongside
+    |QuickFixCmdPre| and |QuickFixCmdPost| that can be matched against when
+    |make.nvim-api-make| is run.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+
+`VIEW_EVENT_PATTERNS`                      *make.nvim-api-view-event-patterns*
+    This field contains all the patterns that will be emitted alongside
+    |User| events when |make.nvim-api-view| is run.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+
+`make.nvim:make`                          *make.nvim-api-make-autocmd-pattern*
+    The actual pattern that can be matched against when writing |autocmd|s
+    for |QuickFixCmdPre| and |QuickFixCmdPost|, emitted similar to how
+    |:make| does when |make.nvim-api-make| is run.
+
+    Also see |make.nvim-differences-to-:make| and
+    |nvim-api-quickfix-event-patterns|.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+`make.nvim:view`                          *make.nvim-api-view-autocmd-pattern*
+    The actual pattern can be matched against when writing |autocmd|s for
+    |User| events when |make.nvim-api-view| is run.
+
+    Similar considerations as |make.nvim-api-view-event-patterns|.
+
+    Attributes: ~
+        Available since: 0.1.0-alpha.2
+
+
+==============================================================================
+DIFFERENCES TO |:make|                        *make.nvim-differences-to-:make*
+
+While the functionality provided by this package tries its best to match how
+the |:make| built-in command would, it differs in some key ways that
+shouldn't affect most use cases:
+
+- all output from executing the compiler command is sent over to a |quickfix|
+  list by default where the user can handle output from the command later;
+- |makeencoding| is ignored completely due to how output is routed;
+- |:cnext| and |:cprevious| do nothing because of how output is routed, with
+  navigating between errors being handled the same way you would navigate a
+  |quickfix| list;
+  - this doesn't work as-is on Windows, so this should result in no change to
+    your workflow there.
+- |makeef| is ignored because of how output is routed, and no error file is
+  written to that can be viewed later or persisted as |makeef| would allow;
+- |shellpipe| is ignored due to how output is routed;
+- changed buffers will never be written, ignoring |autowrite|, requiring you
+  to manually write them yourself;
+- |QuickFixCmdPost| and |QuickFixCmdPre| include an additional pattern that
+  can be matched against to only react to this package's functionality,
+  see |make.nvim-api-make-autocmd-pattern| and
+  |make.nvim-api-quickfix-event-patterns|;
+- |QuickFixCmdPost| is emitted after the asynchronous compilation job is
+  started, not after it's finished, in order to accommodate e.g. opening
+  the quickfix list view on output being immediately received, usually when
+  a compilation job begins.
+
+
+==============================================================================
+DEVELOPMENT                                            *make.nvim-development*
+
+All package development occurs in the repository hosted at the repository link
+provided in the introduction |make.nvim-introduction|.
+
+If you want to contribute, check out the repository and the
+`CONTRIBUTING.rst` file to learn more about how.
+
+
+==============================================================================
+TROUBLESHOOTING                                    *make.nvim-troubleshooting*
+
+As explained in |make.nvim-differences|, this package relies on the same
+things that the built-in |:make| command does, and, since it redirects
+compiler command output to a quickfix list, also relies on the same things
+that quickfix-related functionality does.
+
+This also means that this package breaks in the same ways that those would.
+
+In general, documentation on |:make| should apply to this command, see
+`:h :make`, as well as documentation on |quickfix|, see `:h quickfix`.
+Ignore the parts of these docs that match the stuff listed in
+|make.nvim-differences|.
+
+Some common issues involve |compiler| and |quickfix| options not being set as
+expected for the buffer |filetype| you're working on.
+
+In particular, pay attention to the following options:
+
+- |makeprg|
+- |errorformat|
+- |quickfixtextfunc|
+
+If |makeprg| isn't set properly, check that you've set it up properly and
+that you've run the plugin within the correct context, such as the buffer
+you expect to be built by |makeprg|. An example is running the provided
+function `make` while editing a Rust file buffer in order to invoke
+`cargo`.
+
+You may also need to run |:compiler| in order to set the correct compiler
+options as you expect if your |ftplugin|s don't already do so, see
+`:h compiler`.
+
+If the quickfix list isn't formatted correctly, double-check your
+|errorformat| and |quickfixtextfunc| options and ensure they're set to
+handle output from the command set up in |makeprg|.
+
+Sometimes, it may be as simple as you running |make.nvim-api-make| in
+the wrong |pwd|. Be sure you're using the function in the same places you
+would use the built-in |:make| command.
+
+Be sure that the values set in `vim.g.make_nvim` are correct as well, as
+detailed at |make.nvim-installation|. These can be checked directly by
+running the healthchecks via `:checkhealth make`.
+
+If the above doesn't help, or the error originates from the plugin's code,
+open an issue on the repository linked in the introduction
+|make.nvim-introduction|.
+
+
+
+
+ vim:tw=78:ts=8:sw=4:et:ft=help:norl:
