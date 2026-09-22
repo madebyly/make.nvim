@@ -399,7 +399,8 @@ the wrong |pwd|. Be sure you're using the function in the same places you
 would use the built-in |:make| command.
 
 Be sure that the values set in `vim.g.make_nvim` are correct as well, as
-detailed at |make.nvim-installation|.
+detailed at |make.nvim-installation|. These can be checked directly by
+running the healthchecks via `:checkhealth make`.
 
 If the above doesn't help, or the error originates from the plugin's code,
 open an issue on the repository linked in the introduction
