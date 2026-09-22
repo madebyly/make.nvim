@@ -144,8 +144,15 @@ local function handle_make_async_output(cmd, output, quickfix_list_nr, quickfixt
   end)
 end
 
--- TODO: document this change since the scope is different now
-local AUTOCMD_PATTERNS = { 'make-async' }
+--- @class (exact) Make
+--- @field get_makeprg function Gets the `makeprg` that will be run when `make` is invoked.
+--- @field make function Runs `:make` asynchronously, piping output from the command into a dedicated quickfix list.
+--- @field view function Lists all currently running `:make` jobs, opening the related quickfix list on selection.
+--- @field kill function Lists `:make` jobs and stops them when selected.
+--- @field QUICKFIX_EVENT_PATTERNS string[] Patterns that can be matched against for when `make` is run.
+local M = {}
+
+M.QUICKFIX_EVENT_PATTERNS = { 'make.nvim:make' }
 
 -- Exists only to run the appropriate `autocmd`s once async compilation is complete and the quickfix list is populated.
 --
@@ -159,17 +166,10 @@ local function on_make_async_exit(job_id, exit_code, _)
 
   vim.schedule(function()
     vim.api.nvim_exec_autocmds('QuickFixCmdPost', {
-      pattern = AUTOCMD_PATTERNS,
+      pattern = M.QUICKFIX_EVENT_PATTERNS,
     })
   end)
 end
-
---- @class (exact) Make
---- @field get_makeprg function Gets the `makeprg` that will be run when `make` is invoked.
---- @field make function Runs `:make` asynchronously, piping output from the command into a dedicated quickfix list.
---- @field view function Lists all currently running `:make` jobs, opening the related quickfix list on selection.
---- @field kill function Lists `:make` jobs and stops them when selected.
-local M = {}
 
 -- Runs something similar to the built-in `:make` asynchronously, feeding into a quickfix list while compiling.
 -- Respects all quickfix and compiler options.
@@ -216,7 +216,7 @@ M.make = function(make_args)
 
   -- `:make` would usually cause this autocmd event to fire so this has to replicate it with our own custom pattern.
   vim.api.nvim_exec_autocmds('QuickFixCmdPre', {
-    pattern = AUTOCMD_PATTERNS,
+    pattern = M.QUICKFIX_EVENT_PATTERNS,
   })
 
   -- Need to make a new qflist to store the results in so that old ones aren't clobbered
