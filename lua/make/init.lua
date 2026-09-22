@@ -24,7 +24,7 @@ local make_jobs = {}
 local default_options = {
   icon_incomplete = '…',
   icon_error = '❌',
-  icon_ok = '✓'
+  icon_ok = '✓',
 }
 
 --- @param key 'icon_incomplete' | 'icon_error' | 'icon_ok'
@@ -226,7 +226,7 @@ M.make = function(make_args)
   -- Need to make a new qflist to store the results in so that old ones aren't clobbered
   vim.fn.setqflist({}, ' ', {
     nr = '$',
-    title = string.format('cmd: %s | path: %s', cmd, path)
+    title = string.format('cmd: %s | path: %s', cmd, path),
   })
 
   -- The above doesn't return the qflist number directly due to the `nr` argument so we have to get it manually and
