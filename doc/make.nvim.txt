@@ -339,7 +339,11 @@ shouldn't affect most use cases:
 - |QuickFixCmdPost| and |QuickFixCmdPre| include an additional pattern that
   can be matched against to only react to this package's functionality,
   see |make.nvim-api-make-autocmd-pattern| and
-  |make.nvim-api-quickfix-event-patterns|.
+  |make.nvim-api-quickfix-event-patterns|;
+- |QuickFixCmdPost| is emitted after the asynchronous compilation job is
+  started, not after it's finished, in order to accommodate e.g. opening
+  the quickfix list view on output being immediately received, usually when
+  a compilation job begins.
 
 
 ==============================================================================

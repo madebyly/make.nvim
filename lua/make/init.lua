@@ -165,12 +165,6 @@ M.QUICKFIX_EVENT_PATTERNS = { 'make.nvim:make' }
 local function on_make_async_exit(job_id, exit_code, _)
   make_jobs[job_id].is_complete = true
   make_jobs[job_id].status_code = exit_code
-
-  vim.schedule(function()
-    vim.api.nvim_exec_autocmds('QuickFixCmdPost', {
-      pattern = M.QUICKFIX_EVENT_PATTERNS,
-    })
-  end)
 end
 
 -- Runs something similar to the built-in `:make` asynchronously, feeding into a quickfix list while compiling.
@@ -246,6 +240,10 @@ M.make = function(make_args)
     on_stdout = output_handler,
     on_stderr = output_handler,
     on_exit = on_make_async_exit,
+  })
+
+  vim.api.nvim_exec_autocmds('QuickFixCmdPost', {
+    pattern = M.QUICKFIX_EVENT_PATTERNS,
   })
 
   make_jobs[job_id] = {
