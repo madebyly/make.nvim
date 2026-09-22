@@ -1,9 +1,14 @@
 make-async-news-0.1.0-alpha	news.txt	/*make-async-news-0.1.0-alpha*
 make-async-news.txt	news.txt	/*make-async-news.txt*
 make.nvim-api	make.nvim.txt	/*make.nvim-api*
-make.nvim-api-autocmd-pattern	make.nvim.txt	/*make.nvim-api-autocmd-pattern*
 make.nvim-api-get_makeprg	make.nvim.txt	/*make.nvim-api-get_makeprg*
+make.nvim-api-kill	make.nvim.txt	/*make.nvim-api-kill*
 make.nvim-api-make	make.nvim.txt	/*make.nvim-api-make*
+make.nvim-api-make-autocmd-pattern	make.nvim.txt	/*make.nvim-api-make-autocmd-pattern*
+make.nvim-api-quickfix-event-patterns	make.nvim.txt	/*make.nvim-api-quickfix-event-patterns*
+make.nvim-api-view	make.nvim.txt	/*make.nvim-api-view*
+make.nvim-api-view-autocmd-pattern	make.nvim.txt	/*make.nvim-api-view-autocmd-pattern*
+make.nvim-api-view-event-patterns	make.nvim.txt	/*make.nvim-api-view-event-patterns*
 make.nvim-development	make.nvim.txt	/*make.nvim-development*
 make.nvim-differences-to-:make	make.nvim.txt	/*make.nvim-differences-to-:make*
 make.nvim-features	make.nvim.txt	/*make.nvim-features*
