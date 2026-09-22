@@ -271,7 +271,7 @@ end
 --- @return { choices: string[], job_data: JobData[] } | nil
 local function get_make_job_choices()
   if vim.tbl_isempty(make_jobs) then
-    -- TODO: info log for no jobs active
+    notify("No compiler jobs running! Ignoring command...", vim.log.levels.INFO)
 
     return nil
   end
