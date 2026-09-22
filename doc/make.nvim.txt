@@ -253,7 +253,7 @@ All functionality provided by this package is as follows:
     their associated |quickfix| list active on selection.
 
     Attributes: ~
-        Available since: 0.1.0-alpha.3
+        Available since: 0.1.0-alpha.2
 
 
 `kill()`                                                  *make.nvim-api-kill*
@@ -263,7 +263,7 @@ All functionality provided by this package is as follows:
     See |jobstop| for details on how the termination process works.
 
     Attributes: ~
-        Available since: 0.1.0-alpha.3
+        Available since: 0.1.0-alpha.2
 
 
 `get_makeprg()`                                    *make.nvim-api-get_makeprg*
@@ -284,7 +284,7 @@ All functionality provided by this package is as follows:
     |make.nvim-api-make| is run.
 
     Attributes: ~
-        Available since: 0.1.0-alpha.3
+        Available since: 0.1.0-alpha.2
 
 
 `VIEW_EVENT_PATTERNS`                      *make.nvim-api-view-event-patterns*
@@ -292,7 +292,7 @@ All functionality provided by this package is as follows:
     |User| events when |make.nvim-api-view| is run.
 
     Attributes: ~
-        Available since: 0.1.0-alpha.3
+        Available since: 0.1.0-alpha.2
 
 
 `make.nvim:make`                          *make.nvim-api-make-autocmd-pattern*
@@ -304,7 +304,7 @@ All functionality provided by this package is as follows:
     |nvim-api-quickfix-event-patterns|.
 
     Attributes: ~
-        Available since: 0.1.0-alpha.3
+        Available since: 0.1.0-alpha.2
 
 `make.nvim:view`                          *make.nvim-api-view-autocmd-pattern*
     The actual pattern can be matched against when writing |autocmd|s for
@@ -313,7 +313,7 @@ All functionality provided by this package is as follows:
     Similar considerations as |make.nvim-api-view-event-patterns|.
 
     Attributes: ~
-        Available since: 0.1.0-alpha.3
+        Available since: 0.1.0-alpha.2
 
 
 ==============================================================================
