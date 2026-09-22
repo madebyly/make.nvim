@@ -328,18 +328,13 @@ M.kill = function()
   end
 
   vim.ui.select(data.choices, {
-    -- TODO: maybe explain that this will also remove easy way to access the quickfix list but will leave the list there
     prompt = 'Choose a job to kill: ',
   }, function(_, index)
     if index == nil then
       return
     end
 
-    local job_id = data.job_data[index].job_id
-
-    make_jobs[job_id]:remove()
-
-    vim.fn.jobstop(job_id)
+    vim.fn.jobstop(data.job_data[index].job_id)
   end)
 end
 
