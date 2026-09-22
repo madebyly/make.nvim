@@ -16,18 +16,18 @@ local make_jobs = {}
 
 -- Used when `vim.g.make_nvim` configuration values aren't set
 --- @class (exact) Options
---- @field character_incomplete string
---- @field character_error string
---- @field character_ok string
+--- @field icon_incomplete string
+--- @field icon_error string
+--- @field icon_ok string
 ---
 --- @type Options
 local default_options = {
-  character_incomplete = '…',
-  character_error = '❌',
-  character_ok = '✓'
+  icon_incomplete = '…',
+  icon_error = '❌',
+  icon_ok = '✓'
 }
 
---- @param key 'character_incomplete' | 'character_error' | 'character_ok'
+--- @param key 'icon_incomplete' | 'icon_error' | 'icon_ok'
 ---  @see Options
 ---
 --- @return string The configuration value as set by the user, or the default value for it if none is set.
@@ -277,17 +277,17 @@ local function get_make_job_choices()
   local choices = {}
 
   for _, v in ipairs(job_data) do
-    local character_status_icon = get_configuration_value('character_incomplete')
+    local job_status_icon = get_configuration_value('icon_incomplete')
 
     if v.status_code ~= nil then
       if v.status_code == 0 then
-        character_status_icon = get_configuration_value('character_ok')
+        job_status_icon = get_configuration_value('icon_ok')
       else
-        character_status_icon = get_configuration_value('character_error')
+        job_status_icon = get_configuration_value('icon_error')
       end
     end
 
-    table.insert(choices, string.format('%s | path: %s | cmd: %s', character_status_icon, v.path, v.command))
+    table.insert(choices, string.format('%s | path: %s | cmd: %s', job_status_icon, v.path, v.command))
   end
 
   return { job_data = job_data, choices = choices }
