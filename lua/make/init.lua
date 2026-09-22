@@ -268,12 +268,23 @@ M.get_makeprg = function()
   return makeprg
 end
 
---- @return { choices: string[], job_data: JobData[] } | nil
-local function get_make_job_choices()
-  if vim.tbl_isempty(make_jobs) then
-    notify("No compiler jobs running! Ignoring command...", vim.log.levels.INFO)
+--- @param job_data JobData
+--- @return string
+local function get_job_status_icon(job_data)
+  if job_data.status_code == nil then
+    return get_configuration_value('icon_incomplete')
+  elseif job_data.status_code == 0 then
+    return get_configuration_value('icon_ok')
+  else
+    return get_configuration_value('icon_error')
+  end
+end
 
-    return nil
+M.view = function()
+  if vim.tbl_isempty(make_jobs) then
+    notify('No compiler jobs ever created! Not viewing...', vim.log.levels.INFO)
+
+    return
   end
 
   local job_data = vim.tbl_values(make_jobs)
@@ -282,59 +293,61 @@ local function get_make_job_choices()
   local choices = {}
 
   for _, v in ipairs(job_data) do
-    local job_status_icon = get_configuration_value('icon_incomplete')
-
-    if v.status_code ~= nil then
-      if v.status_code == 0 then
-        job_status_icon = get_configuration_value('icon_ok')
-      else
-        job_status_icon = get_configuration_value('icon_error')
-      end
-    end
-
-    table.insert(choices, string.format('%s | path: %s | cmd: %s', job_status_icon, v.path, v.command))
+    table.insert(choices, string.format('%s | path: %s | cmd: %s', get_job_status_icon(job_data), v.path, v.command))
   end
 
-  return { job_data = job_data, choices = choices }
-end
-
-M.view = function()
-  local data = get_make_job_choices()
-
-  if data == nil then
-    return
-  end
-
-  vim.ui.select(data.choices, {
+  vim.ui.select(choices, {
     prompt = 'Choose a job to view output for: ',
   }, function(_, index)
     if index == nil then
       return
     end
 
-    vim.cmd(string.format('%d%s', data.job_data[index].quickfix_list_nr, 'chistory'))
+    vim.cmd(string.format('%d%s', job_data[index].quickfix_list_nr, 'chistory'))
 
     vim.api.nvim_exec_autocmds('User', {
-      pattern = M.VIEW_EVENT_PATTERNS
+      pattern = M.VIEW_EVENT_PATTERNS,
     })
   end)
 end
 
 M.kill = function()
-  local data = get_make_job_choices()
+  if vim.tbl_isempty(make_jobs) then
+    notify('No compiler jobs ever created! Not prompting for selection...', vim.log.levels.INFO)
 
-  if data == nil then
     return
   end
 
-  vim.ui.select(data.choices, {
+  --- @type JobData[]
+  local job_data = vim.tbl_values(vim.tbl_filter(
+    --- @param v JobData
+    function(v)
+      return v.is_complete == false
+    end,
+    make_jobs
+  ))
+
+  if vim.tbl_isempty(job_data) then
+    notify('No currently running compiler jobs! Not prompting for selection...', vim.log.levels.INFO)
+
+    return
+  end
+
+  --- @type string[]
+  local choices = {}
+
+  for _, v in ipairs(job_data) do
+    table.insert(choices, string.format('%s | path: %s | cmd: %s', get_job_status_icon(job_data), v.path, v.command))
+  end
+
+  vim.ui.select(choices, {
     prompt = 'Choose a job to kill: ',
   }, function(_, index)
     if index == nil then
       return
     end
 
-    vim.fn.jobstop(data.job_data[index].job_id)
+    vim.fn.jobstop(job_data[index].job_id)
   end)
 end
 
