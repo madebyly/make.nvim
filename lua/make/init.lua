@@ -10,6 +10,8 @@ local LOG_PREFIX = 'make.nvim'
 --- @field status_code number|nil The status code of the job command when it finished or nil if it isn't finished.
 --- @field command string The full command of the job.
 --- @field path string The path to the file of the buffer that started the job.
+--- @field created_at number The timestamp when the job was started.
+--- @field completed_at? number The timestamp when the job was completed.
 --
 --- @type table<JobId, JobData>
 local make_jobs = {}
@@ -156,15 +158,12 @@ local M = {}
 M.VIEW_EVENT_PATTERNS = { 'make.nvim:view' }
 M.QUICKFIX_EVENT_PATTERNS = { 'make.nvim:make' }
 
--- Exists only to run the appropriate `autocmd`s once async compilation is complete and the quickfix list is populated.
---
--- All parameters are detailed in Neovim's official docs for `:h job-control` under `on_exit`.
---
 --- @param job_id      number
 --- @param exit_code   number
 local function on_make_async_exit(job_id, exit_code, _)
   make_jobs[job_id].is_complete = true
   make_jobs[job_id].status_code = exit_code
+  make_jobs[job_id].completed_at = os.time()
 end
 
 -- Runs something similar to the built-in `:make` asynchronously, feeding into a quickfix list while compiling.
@@ -252,6 +251,7 @@ M.make = function(make_args)
     is_complete = false,
     command = cmd,
     path = path,
+    created_at = os.time()
   }
 end
 
@@ -279,6 +279,8 @@ local function get_job_status_icon(job_data)
 end
 
 M.view = function()
+  vim.print(make_jobs)
+
   if vim.tbl_isempty(make_jobs) then
     notify('No compiler jobs ever created! Not viewing...', vim.log.levels.INFO)
 
@@ -286,6 +288,10 @@ M.view = function()
   end
 
   local job_data = vim.tbl_values(make_jobs)
+
+  table.sort(job_data, function (a, b)
+    return a.created_at >= b.created_at
+  end)
 
   --- @type string[]
   local choices = {}
